@@ -5,6 +5,7 @@
 * Docker image code repository for Snakemake GUI Controller
 * CI process is implented by Github Action
 * Reference: https://github.com/OpenKBC/snakemake-gui-controller
+* Docker hub: https://hub.docker.com/repository/docker/swiri021/snakemake-gui-controller
 
 ### Usage
 ```
