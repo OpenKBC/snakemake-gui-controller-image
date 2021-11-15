@@ -1,5 +1,5 @@
 __author__ = "Junhee Yoon"
-__version__ = "1.0.0"
+__version__ = "1.0.2"
 __maintainer__ = "Junhee Yoon"
 __email__ = "swiri021@gmail.com"
 
@@ -30,6 +30,9 @@ import json
 from celery import Celery, current_task
 from celery.result import AsyncResult
 from subprocess import Popen, PIPE
+
+# Internal libraries
+from libraries import handlers
 
 
 app = Flask(__name__)
@@ -99,7 +102,7 @@ def config_yaml_creator():
         pass;
 
     val = session.get('selected_pipeline', None) # yaml path
-    yaml_data = _parsing_yamlFile(val) # Parsing yaml data
+    yaml_data = handlers._parsing_yamlFile(val) # Parsing yaml data
 
     for key, value in yaml_data.items(): # Loop with yaml keys
         setattr(SnakeMakeForm, key, StringField(key, validators=[InputRequired()], render_kw={'placeholder': value})) # set key with yaml key and placehoder with value
@@ -112,7 +115,7 @@ def config_yaml_creator():
         for formData, yamlKeys in zip(form, yaml_data.keys()):
             result_yaml_data[yamlKeys]=formData.data
         
-        yaml_output = _reform_yamlFile(val, result_yaml_data) # make result yaml file
+        yaml_output = handlers._reform_yamlFile(val, result_yaml_data, str(session.get('_id', None))) # make result yaml file
         session['yaml_output'] = yaml_output
         return redirect(url_for('workflow_status'))
 
@@ -143,29 +146,6 @@ def workflow_progress():
         return json.dumps(dict( state=job.state, msg=job.result['msg'],))
 
     elif job.state == 'SUCCESS':
-        ## S3 Connection
-        output_counter = int(session.get('output_count', None))
-        output_folder_list = [ session.get('output'+str(i), None) for i in range(output_counter)]
-        print(output_folder_list)
-        # logID = session.get('logID', None)
-        
-        # bucket_name = 'openkbc-ms-result-bucket' # fixed bucket
-        # #bucket_dest = 's3://'+bucket_name+"/"+logID+"/"
-
-        # s3 = boto3.client('s3') # Client set, S3
-        # def file_uploader(path): # self-recursive function
-        #     filelist = glob.glob(path+"/*") # search all files
-        #     for fname in filelist: # get name
-        #         if os.path.isfile(fname):
-        #             print(fname)
-        #             with open(fname, "rb") as f:
-        #                 s3.upload_fileobj(f, bucket_name, logID+"/"+os.path.basename(fname)) # upload to s3
-        #         else:
-        #             file_uploader(fname)
-        # for path in output_folder_list:
-        #     file_uploader(path)
-        # ## S3 Upload process END
-
         return json.dumps(dict( state=job.state, msg="done",))
 
     elif job.state == 'FAILURE':
@@ -181,79 +161,6 @@ def workflow_status():
     return render_template('progress.html', JOBID=job.id)
 
 #########Route###########
-
-# Parsing function for yaml data, only work 2 layer nested yaml file
-def _parsing_yamlFile(workflow_path):
-    """
-    Description: This function parses yaml format in config.yaml, and returns dictionary with parse data
-    
-    Input: yaml path
-    Output: Dictionary with parse data
-    """
-    
-    ## yaml check
-    ## yaml check
-    print(workflow_path)
-    with open(workflow_path+"/config.yaml", "r") as stream: # Open yaml
-        try:
-            yaml_data = yaml.safe_load(stream) # Parse auto with pyyaml
-        except yaml.YAMLError as exc:
-            print(exc)
-    
-    new_result = {} # for new result dictionary
-    for key, value in yaml_data.items():
-        if isinstance(value, dict)==True: # Nested dictionary
-            for nkey, nval in value.items(): # Only key name for making form
-                new_result[key+"--"+nkey] = nval # Nested key has '--', making flatten
-        else:
-            new_result[key]=value #just pass with normal dictionary
-    return new_result
-
-# Custom yaml converting function because of pyyaml unexpected charter
-def _reform_yamlFile(selected_pipeline, data_dict):
-    """
-    Description: This function converts dictionary to yaml for snakemake, and write yaml file on the path
-    
-    Input: pipeline path and dictionary data
-    Output: yaml file
-    """
-    yamlFileName = selected_pipeline+"/config_"+str(session.get('_id', None))+".yaml"
-    f = open(yamlFileName, "w") # write file with unique name
-
-    nested_items = [] # List for handing nested items
-    output_count=0 # Output key count(Tracking purpose)
-    for key, value in data_dict.items():
-        if key.find('--')>-1: # Nested key has '--'
-            subkeys = key.split('--')# 2 layers keys
-            nested_items.append([subkeys[0],subkeys[1],value]) #make list
-        else:
-            ## Tracking output path and user ID
-            if key.find("Output") > -1 or key.find("output") > -1: ## key has 'output' string
-                session['output'+str(output_count)]=value # set session for output folder (Tracking purpose)
-                output_count+=1
-            session['output_count'] = output_count # set session for output counter (Tracking purpose)
-
-            if key.find('logID') > -1: # Find log ID
-                session['logID'] = value # set session for ID
-            ## Tracking output path and user ID
-
-            f.write(key+": "+value+"\n") ## Write new form of yaml
-    
-    ### Add error handling here
-    ### Add error handling here
-    key1_unique=list(set([x[0] for x in nested_items])) # make a list of root key
-    for x in key1_unique:
-        f.write(x+":"+"\n") # first line of nested key (root key)
-        for y in nested_items:
-            if y[0]==x:
-                f.write("  "+y[1]+": "+y[2]+"\n") # sub-key and value
-    
-    f.close()
-    return yamlFileName
-
-def get_filenames(path):
-    filelist = glob.glob(path+"/*")
-    return filelist
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
