@@ -22,7 +22,7 @@ import glob
 
 # Custom form making
 from wtforms.validators import InputRequired
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
 
 # Celery running
@@ -32,7 +32,7 @@ from celery.result import AsyncResult
 from subprocess import Popen, PIPE
 
 # Internal libraries
-from libraries import handlers
+from libraries.handlers import yamlHandlers
 
 
 app = Flask(__name__)
@@ -98,11 +98,11 @@ def config_yaml_creator():
     """
 
     # Frame Form, could be added default setting for snakemake commandline
-    class SnakeMakeForm(Form):
+    class SnakeMakeForm(FlaskForm):
         pass;
 
     val = session.get('selected_pipeline', None) # yaml path
-    yaml_data = handlers._parsing_yamlFile(val) # Parsing yaml data
+    yaml_data = yamlHandlers._parsing_yamlFile(val) # Parsing yaml data
 
     for key, value in yaml_data.items(): # Loop with yaml keys
         setattr(SnakeMakeForm, key, StringField(key, validators=[InputRequired()], render_kw={'placeholder': value})) # set key with yaml key and placehoder with value
@@ -115,7 +115,7 @@ def config_yaml_creator():
         for formData, yamlKeys in zip(form, yaml_data.keys()):
             result_yaml_data[yamlKeys]=formData.data
         
-        yaml_output = handlers._reform_yamlFile(val, result_yaml_data, str(session.get('_id', None))) # make result yaml file
+        yaml_output = yamlHandlers._reform_yamlFile(val, result_yaml_data, str(session.get('_id', None))) # make result yaml file
         session['yaml_output'] = yaml_output
         return redirect(url_for('workflow_status'))
 
