@@ -3,13 +3,13 @@ __version__ = "1.0.2"
 __maintainer__ = "Junhee Yoon"
 __email__ = "swiri021@gmail.com"
 
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import SubmitField, SelectField
 
 import glob
 
 # Form ORM
-class InitForm(Form):
+class InitForm(FlaskForm):
 
     # Internal function to create form
     def _get_directory_name():
