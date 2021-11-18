@@ -5,13 +5,13 @@ on:
     branches: [ master ]
 
 jobs:
-  push_to_registry:
-    env:
-      #TAG_NAME: ${{ github.event.release.tag_name }}
-      TAG_NAME: v1.0.3
-      
+  push_to_registry:      
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
+    env:
+    #TAG_NAME: ${{ github.event.release.tag_name }}
+      TAG_NAME: v1.0.3
+      
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -36,4 +36,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: swiri021/snakemake-gui-controller:${TAG_NAME}
+          tags: 'swiri021/snakemake-gui-controller:${TAG_NAME}'
