@@ -1,13 +1,16 @@
 name: Docker Image CI
 
 on:
-  push:
-    branches: [ master ]
+  release:
+    types: [ release ]
 #  pull_request:
 #    branches: [ main ]
 
 jobs:
-  push_to_registry:  
+  push_to_registry:
+    env:
+      TAG_NAME: ${{ github.event.release.tag_name }}
+    
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     steps:
@@ -34,4 +37,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: swiri021/snakemake-gui-controller:v1.0.3
+          tags: swiri021/snakemake-gui-controller:${TAG_NAME}
