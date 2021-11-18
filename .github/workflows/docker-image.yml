@@ -1,8 +1,6 @@
 name: SGC Docker Image CI
 
 on:
-  release:
-    types: [ released ]
   push:
     branches: [ main ]
 
