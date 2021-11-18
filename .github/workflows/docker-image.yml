@@ -2,7 +2,7 @@ name: Docker Image CI
 
 on:
   release:
-    types: [ release ]
+    types: [ released ]
 #  pull_request:
 #    branches: [ main ]
 
