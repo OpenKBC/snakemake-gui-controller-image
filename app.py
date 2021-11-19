@@ -6,7 +6,7 @@ __email__ = "swiri021@gmail.com"
 # Flask related libraries
 from flask import Flask, request, render_template, redirect, url_for, session
 from flask_bootstrap import Bootstrap
-from models import InitForm
+from models import InitForm, SnakeMakeForm
 
 # Flask apps libraries
 from flask_nav import Nav
@@ -96,11 +96,7 @@ def config_yaml_creator():
     """
     Making a form by parsing config.yaml
     """
-
     # Frame Form, could be added default setting for snakemake commandline
-    class SnakeMakeForm(FlaskForm):
-        pass;
-
     val = session.get('selected_pipeline', None) # yaml path
     yaml_data = yamlHandlers._parsing_yamlFile(val) # Parsing yaml data
 
@@ -121,18 +117,19 @@ def config_yaml_creator():
 
     return render_template('config_yaml_creator.html', form=form)
 
-@celery.task()
-def workflow_running(pipeline_path, yaml_file):
-    proc = Popen(['conda', 'run', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
+@celery.task(bind=True)
+def workflow_running(self, pipeline_path, yaml_file):
+    proc = Popen(['conda', 'run', '-vv', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
         '--cores', str(3), '--directory', pipeline_path, '--configfile', yaml_file], stdin=PIPE, stdout=PIPE, stderr=PIPE)
-    print(" ".join(['conda', 'run', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
+    print(" ".join(['conda', 'run', '-vv', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
         '--cores', str(3), '--directory', pipeline_path, '--configfile', yaml_file]))
     # It is not working with snakemake
     while True:
-        line = proc.stdout.readline()
-        if not line:
+        # Snakemake uses stderr for logging
+        line_err = proc.stderr.readline()
+        if not line_err:
             break
-        current_task.update_state(state='PROGRESS', meta={'msg': str(line)})
+        current_task.update_state(state='PROGRESS', meta={'msg': str(line_err.decode('ascii'))})
     return 999
 
 @app.route("/workflow_progress")

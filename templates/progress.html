@@ -15,23 +15,31 @@
     <script src="//code.jquery.com/jquery-2.1.1.min.js"></script>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script>
-    var csrf_token = "{{ csrf_token() }}";
+    var csrftoken = $('meta[name=csrf-token]').attr('content')
     $.ajaxSetup({
-        beforeSend: function(xhr, settings) {
-            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
-                xhr.setRequestHeader("X-CSRFToken", csrf_token);
+    beforeSend: function(xhr, settings) {
+        if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+            xhr.setRequestHeader("X-CSRFToken", csrftoken)
             }
         }
     });
 
+    var added_msg = '';
     function poll() {
         $.ajax("{{url_for('.workflow_progress', jobid=JOBID)}}", {
             dataType: "json"
             , success: function(resp) {
                 console.log(resp);
-                $("#pct").html("<b>Workflow has been completed</b>");
-                if(resp.msg == 'done') {
+                //$("#pct").html("<b>Workflow has been completed</b>");
+                $("#pct").html(added_msg+"<b>Workflow has been completed</b><br />");
+                if(resp.state == 'SUCCESS') {
                     return;
+                }
+                else if(resp.state == 'PROGRESS'){
+                    new_msg = "<b>"+resp.msg+"</b><br />";
+                    added_msg += new_msg;
+                    $("#pct").html(added_msg);
+                    setTimeout(poll, 1000.0);
                 }
                 else{
                     $("#pct").html("<img src='/static/spinning-loading.gif'>");

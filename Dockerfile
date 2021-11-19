@@ -2,6 +2,7 @@ FROM continuumio/miniconda
 
 COPY . /pipeline_controller
 
+RUN apt-get install -y vim
 RUN conda create -n pipeline_controller_base python=3.8.2 R=3.6
 SHELL ["conda", "run", "-n", "pipeline_controller_base", "/bin/bash", "-c"]
 
