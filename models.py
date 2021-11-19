@@ -22,3 +22,7 @@ class InitForm(FlaskForm):
 
     pipeline_name = SelectField('Please select your pipeline to run: ', choices=_get_directory_name())
     submit = SubmitField('Submit')
+
+# Frame Form, could be added default setting for snakemake commandline
+class SnakeMakeForm(FlaskForm):
+    pass;
