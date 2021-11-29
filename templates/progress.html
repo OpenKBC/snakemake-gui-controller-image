@@ -30,9 +30,11 @@
             dataType: "json"
             , success: function(resp) {
                 console.log(resp);
-                //$("#pct").html("<b>Workflow has been completed</b>");
-                $("#pct").html(added_msg+"<b>Workflow has been completed</b><br />");
+                //$("#pct").html(added_msg+"<b>Workflow has been completed</b><br />");
                 if(resp.state == 'SUCCESS') {
+                    new_msg = "<b>"+resp.msg+"</b><br />";
+                    added_msg += new_msg;
+                    $("#pct").html(added_msg+"<b>Workflow has been completed</b><br />");
                     return;
                 }
                 else if(resp.state == 'PROGRESS'){
@@ -40,6 +42,10 @@
                     added_msg += new_msg;
                     $("#pct").html(added_msg);
                     setTimeout(poll, 1000.0);
+                }
+                else if(resp.state == 'FAILURE'){
+                    $("#pct").html(added_msg+"<b>Pipeline has an error! Please look at the pipeline logs manually</b><br />");
+                    return;
                 }
                 else{
                     $("#pct").html("<img src='/static/spinning-loading.gif'>");

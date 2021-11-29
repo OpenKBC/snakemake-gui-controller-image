@@ -38,7 +38,9 @@ from libraries.handlers import yamlHandlers
 app = Flask(__name__)
 
 SECRET_KEY = os.urandom(32)
-app.config['SECRET_KEY'] = SECRET_KEY # CSRF key
+# CSRF key, please change fixed key for local testing purpose
+app.config['SECRET_KEY'] = SECRET_KEY
+#app.config['SECRET_KEY'] = SECRET_KEY
 app.config['WTF_CSRF_TIME_LIMIT']=None
 
 ## Celery setting
@@ -117,20 +119,27 @@ def config_yaml_creator():
 
     return render_template('config_yaml_creator.html', form=form)
 
-@celery.task(bind=True)
+@celery.task(bind=True) # For tracking state, this function has to be bind(True) and function needs 'self'
 def workflow_running(self, pipeline_path, yaml_file):
     proc = Popen(['conda', 'run', '-vv', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
         '--cores', str(3), '--directory', pipeline_path, '--configfile', yaml_file], stdin=PIPE, stdout=PIPE, stderr=PIPE)
     print(" ".join(['conda', 'run', '-vv', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
         '--cores', str(3), '--directory', pipeline_path, '--configfile', yaml_file]))
-    # It is not working with snakemake
-    while True:
-        # Snakemake uses stderr for logging
-        line_err = proc.stderr.readline()
-        if not line_err:
-            break
-        current_task.update_state(state='PROGRESS', meta={'msg': str(line_err.decode('ascii'))})
-    return 999
+    
+    msg_txt = proc.communicate()[1].decode('utf8').strip()
+    print(msg_txt)
+    current_task.update_state(state='PROGRESS', meta={'msg': msg_txt})
+
+    # line by line, but it is not working
+    # while True:
+    #     txt = proc.stderr.readline()
+    #     if not txt:
+    #         break
+    #     msg_txt = txt.decode('utf8').strip()
+    #     print(msg_txt)
+    #     current_task.update_state(state='PROGRESS', meta={'msg': msg_txt})
+
+    return msg_txt.replace('\n', '<br />')
 
 @app.route("/workflow_progress")
 def workflow_progress():
@@ -140,10 +149,10 @@ def workflow_progress():
         job = AsyncResult(jobid, app=celery)
     print(job.state)
     if job.state == 'PROGRESS':
-        return json.dumps(dict( state=job.state, msg=job.result['msg'],))
+        return json.dumps(dict( state=job.state, msg=str(job.info['msg']),))
 
     elif job.state == 'SUCCESS':
-        return json.dumps(dict( state=job.state, msg="done",))
+        return json.dumps(dict( state=job.state, msg=str(job.get()),))
 
     elif job.state == 'FAILURE':
         return json.dumps(dict( state=job.state, msg="failture",)) ## return somewhere to exit
