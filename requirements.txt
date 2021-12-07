@@ -11,3 +11,4 @@ redis==3.5.3
 snakemake==6.8.0
 pytest==6.2.5
 omegaconf==2.1.1
+graphviz==0.16
