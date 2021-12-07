@@ -1,5 +1,5 @@
 __author__ = "Junhee Yoon"
-__version__ = "1.0.2"
+__version__ = "1.0.4"
 __maintainer__ = "Junhee Yoon"
 __email__ = "swiri021@gmail.com"
 
@@ -14,16 +14,12 @@ from flask_nav.elements import Navbar, View
 from flask_wtf.csrf import CSRFProtect
 
 # Additional function libraries
-import yaml
 import uuid
 import os
-import subprocess
-import glob
 
 # Custom form making
 from wtforms.validators import InputRequired
-from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField
+from wtforms import StringField, SubmitField, BooleanField
 
 # Celery running
 import json
@@ -104,6 +100,7 @@ def config_yaml_creator():
 
     for key, value in yaml_data.items(): # Loop with yaml keys
         setattr(SnakeMakeForm, key, StringField(key, validators=[InputRequired()], render_kw={'placeholder': value})) # set key with yaml key and placehoder with value
+    setattr(SnakeMakeForm, 'dag', BooleanField('Draw DAG ?')) # Check box for drawing DAG
     setattr(SnakeMakeForm, 'submit', SubmitField('Submit')) # Make submit button on the bottomss
     form = SnakeMakeForm(request.form) # set form
 
@@ -112,22 +109,33 @@ def config_yaml_creator():
         # order is same as form order
         for formData, yamlKeys in zip(form, yaml_data.keys()):
             result_yaml_data[yamlKeys]=formData.data
+            print(formData, yamlKeys)
         
         yaml_output = yamlHandlers._reform_yamlFile(val, result_yaml_data, str(session.get('_id', None))) # make result yaml file
         session['yaml_output'] = yaml_output
+        session['dag_call'] = form.dag.data
+        
         return redirect(url_for('workflow_status'))
 
     return render_template('config_yaml_creator.html', form=form)
 
 @celery.task(bind=True) # For tracking state, this function has to be bind(True) and function needs 'self'
-def workflow_running(self, pipeline_path, yaml_file):
-    proc = Popen(['conda', 'run', '-vv', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
-        '--cores', str(3), '--directory', pipeline_path, '--configfile', yaml_file], stdin=PIPE, stdout=PIPE, stderr=PIPE)
-    print(" ".join(['conda', 'run', '-vv', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
-        '--cores', str(3), '--directory', pipeline_path, '--configfile', yaml_file]))
-    
+def workflow_running(self, pipeline_path, yaml_file, dag_call):
+    print(dag_call)
+
+    if dag_call==False:
+        ## Snakemake call
+        proc = Popen(['conda', 'run', '-vv', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
+            '--cores', str(3), '--directory', pipeline_path, '--configfile', yaml_file], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        #print(" ".join(['conda', 'run', '-vv', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile',\
+        #    '--cores', str(3), '--directory', pipeline_path, '--configfile', yaml_file]))
+
+    else:
+        ## DAG call
+        proc = Popen(['conda', 'run', '-vv', '-n', 'pipeline_controller_base', 'snakemake', '--snakefile', pipeline_path+'Snakefile', \
+            '--directory', pipeline_path, '--configfile', yaml_file, '--dag', '|', 'dot', '-Tsvg', '>', pipeline_path+'dag.svg' ], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+
     msg_txt = proc.communicate()[1].decode('utf8').strip()
-    print(msg_txt)
     current_task.update_state(state='PROGRESS', meta={'msg': msg_txt})
 
     # line by line, but it is not working
@@ -138,8 +146,11 @@ def workflow_running(self, pipeline_path, yaml_file):
     #     msg_txt = txt.decode('utf8').strip()
     #     print(msg_txt)
     #     current_task.update_state(state='PROGRESS', meta={'msg': msg_txt})
-
     return msg_txt.replace('\n', '<br />')
+
+@celery.task(bind=True) # For tracking state, this function has to be bind(True) and function needs 'self'
+def dag_running(self):
+    print()
 
 @app.route("/workflow_progress")
 def workflow_progress():
@@ -152,7 +163,10 @@ def workflow_progress():
         return json.dumps(dict( state=job.state, msg=str(job.info['msg']),))
 
     elif job.state == 'SUCCESS':
-        return json.dumps(dict( state=job.state, msg=str(job.get()),))
+        if session.get('dag_call', None)==True:
+            return json.dumps(dict( state=job.state, msg=str(job.get()), svg='dag.svg'))
+        else:
+            return json.dumps(dict( state=job.state, msg=str(job.get()),))
 
     elif job.state == 'FAILURE':
         return json.dumps(dict( state=job.state, msg="failture",)) ## return somewhere to exit
@@ -162,8 +176,9 @@ def workflow_progress():
 def workflow_status():
     pipeline_path = session.get('selected_pipeline', None) # Pipeline path
     yaml_file = session.get('yaml_output', None) # yaml file
+    dag_call = session.get('dag_call', None) # DAG calling or not
 
-    job = workflow_running.delay(pipeline_path, yaml_file)
+    job = workflow_running.delay(pipeline_path, yaml_file, dag_call)
     return render_template('progress.html', JOBID=job.id)
 
 #########Route###########

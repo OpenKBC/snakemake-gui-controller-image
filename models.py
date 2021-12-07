@@ -1,5 +1,5 @@
 __author__ = "Junhee Yoon"
-__version__ = "1.0.2"
+__version__ = "1.0.4"
 __maintainer__ = "Junhee Yoon"
 __email__ = "swiri021@gmail.com"
 

@@ -1,4 +1,0 @@
-InputFolder: inputFolder/inputfile.txt
-Output:
-  Path: outputFolder/
-  Name: outputfile.txt
